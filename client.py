@@ -1,9 +1,6 @@
 import socket
 from libs.common import *
-import os
-import math
-import constants as const
-import ipaddress
+buffer_size = 2048
 
 
 class Client:
@@ -18,7 +15,12 @@ class Client:
         self.quantity_chunks = len(chunks)
 
     def __chunks_ids_to_bytes(self):
-        return b"".join([chunk.to_bytes(2, 'big') for chunk in chunks])
+        return b"".join([chunk.to_bytes(2, 'big') for chunk in self.chunks])
+
+    def __receive_request(self, sock):
+        packet, addr = sock.recvfrom(buffer_size)
+        print(f"<-- Received: {packet} from {addr}")
+        return packet, addr
 
     def __request_hello(self, sock):
         request = (1).to_bytes(2, 'big') + self.quantity_chunks.to_bytes(2, 'big') \
@@ -31,6 +33,7 @@ class Client:
         with socket.socket(sock_ip_version, socket.SOCK_DGRAM) as sock:
             sock.bind(self.local_addr)
             self.__request_hello(sock)
+            self.__receive_request(sock)
         return 0
 
 

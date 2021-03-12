@@ -3,12 +3,38 @@ from libs.common import *
 buffer_size = 2048
 
 
+def decode_key_values_file(addr):
+    try:
+        key_values_file = open(addr, "r")
+        chunks_dict = {}
+        while True:
+            line = key_values_file.readline()
+            if len(line) > 0:
+                chunk_id, chunk_file_name = line.split(sep=": ")
+                chunk_file_name_split = chunk_file_name.split('.')
+                chunk_file_name = chunk_file_name_split[0] + '.' + chunk_file_name_split[1][:3]
+                chunks_dict[int(chunk_id)] = chunk_file_name
+            else:
+                break
+        return chunks_dict
+    except Exception as e:
+        print("ERROR: Key values file not found or invalid.")
+        sys.exit()
+
+
 class Peer:
-    def __init__(self, local_addr, ip_version=4):
+    def __init__(self, local_addr, local_chunks, ip_version=4):
         self.ip_version = socket.AF_INET if ip_version == 4 else socket.AF_INET6
         self.sock = socket.socket(self.ip_version, socket.SOCK_DGRAM)
         self.local_addr = local_addr
         self.sock.bind(self.local_addr)
+        self.local_chunks = local_chunks
+
+    def __get_available_chunks_ids(self, chunks):
+        return sorted(list(set(self.local_chunks).intersection(chunks)))
+
+    def __chunks_ids_to_bytes(self, chunks):
+        return b"".join([chunk.to_bytes(2, 'big') for chunk in chunks])
 
     def __receive_request(self):
         packet, addr = self.sock.recvfrom(buffer_size)
@@ -25,16 +51,17 @@ class Peer:
                               for x in range(0, quantity_chunk)]
             return chunks_id_list, client_addr
 
-    def __send_chunk_info(self):
-        request = (1).to_bytes(2, 'big') + self.quantity_chunks.to_bytes(2, 'big') \
-                  + self.__chunks_ids_to_bytes()
-        print(f"--> Sending: {request} to {self.starting_peer_addr}")
-        self.sock.sendto(request, self.starting_peer_addr)
+    def __send_chunk_info(self, chunks_list, client_addr):
+        available_chunks = self.__get_available_chunks_ids(chunks_list)
+        response = (3).to_bytes(2, 'big') + len(available_chunks).to_bytes(2, 'big') \
+                    + self.__chunks_ids_to_bytes(available_chunks)
+        print(f"--> Sending: {response} to {client_addr}")
+        self.sock.sendto(response, client_addr)
 
     def connect(self):
         chunks_id_list, client_addr = self.__receive_hello()
         print(chunks_id_list, client_addr)
-        self.__send_chunk_info()
+        self.__send_chunk_info(chunks_id_list, client_addr)
 
 
 if __name__ == "__main__":
@@ -42,5 +69,7 @@ if __name__ == "__main__":
         usage("peer", sys.argv[0])
 
     local_addr = ('127.0.0.1', int(sys.argv[1]))
-    peer = Peer(local_addr)
+    local_chunks = decode_key_values_file(sys.argv[2])
+
+    peer = Peer(local_addr, local_chunks)
     peer.connect()
