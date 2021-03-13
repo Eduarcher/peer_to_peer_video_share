@@ -51,16 +51,17 @@ class Client:
         sock.sendto(request, addr)
         return request_chunks
 
-    def __receive_chunks_response(self, sock, requested):
-        while len(self.target_chunks) > 0:
+    def __receive_chunks_response(self, sock, requested, peer_addr):
+        log_file = open(f"output{local_addr[0]}.log", "w")
+        while len(requested) > 0:
             packet, addr = self.__receive_request(sock)
             if int.from_bytes(packet[:2], 'big') != 5:
                 continue
             else:
                 id_chunk = int.from_bytes(packet[2:4], 'big')
                 size_chunk = int.from_bytes(packet[4:6], 'big')
-                chunk_data = packet[6:]
-                print(f"{id_chunk}, {size_chunk}, {chunk_data[:20]}")
+                chunk_data = packet[6:6+size_chunk]
+                log_file.write(f"{peer_addr[0]}:{peer_addr[1]} - {id_chunk}\n")
                 requested.remove(id_chunk)
 
     def connect(self):
@@ -71,7 +72,7 @@ class Client:
             available_chunks, peer_addr = self.__receive_chunks_info(sock)
             print(f"Available chunks: {available_chunks} at {peer_addr}")
             requested_chunks = self.__request_get_chunks(sock, available_chunks, peer_addr)
-            self.__receive_chunks_response(sock, requested_chunks)
+            self.__receive_chunks_response(sock, requested_chunks, peer_addr)
         return 0
 
 
