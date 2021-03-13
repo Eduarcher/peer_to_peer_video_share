@@ -1,6 +1,8 @@
 import socket
+import constants as const
 from libs.common import *
-buffer_size = 2048
+from pathlib import Path
+BUFFER_SIZE = const.buffer_size
 
 
 class Client:
@@ -18,8 +20,13 @@ class Client:
         chunks = self.target_chunks if not chunks else chunks
         return b"".join([chunk.to_bytes(2, 'big') for chunk in chunks])
 
+    def __init_folder_and_file(self, folder, file, write_bytes=False):
+        write_method = "wb" if write_bytes else "w"
+        Path(folder).mkdir(parents=True, exist_ok=True)
+        return open(f"{folder}{file}", write_method)
+
     def __receive_request(self, sock):
-        packet, addr = sock.recvfrom(buffer_size)
+        packet, addr = sock.recvfrom(BUFFER_SIZE)
         print(f"<-- Received: {packet[:min(20, len(packet))]}(Showing 20 bytes) from {addr}")
         return packet, addr
 
@@ -52,17 +59,22 @@ class Client:
         return request_chunks
 
     def __receive_chunks_response(self, sock, requested, peer_addr):
-        log_file = open(f"output{local_addr[0]}.log", "w")
+        log_file = self.__init_folder_and_file(const.log_output_folder,
+                                               f"output{local_addr[0]}.log")
         while len(requested) > 0:
             packet, addr = self.__receive_request(sock)
             if int.from_bytes(packet[:2], 'big') != 5:
                 continue
             else:
                 id_chunk = int.from_bytes(packet[2:4], 'big')
-                size_chunk = int.from_bytes(packet[4:6], 'big')
-                chunk_data = packet[6:6+size_chunk]
-                log_file.write(f"{peer_addr[0]}:{peer_addr[1]} - {id_chunk}\n")
-                requested.remove(id_chunk)
+                if id_chunk in requested:
+                    size_chunk = int.from_bytes(packet[4:6], 'big')
+                    chunk_data = packet[6:6+size_chunk]
+                    output_file = self.__init_folder_and_file(const.file_output_folder,
+                                                              f"chunk_{id_chunk}", True)
+                    output_file.write(chunk_data)
+                    log_file.write(f"{peer_addr[0]}:{peer_addr[1]} - {id_chunk}\n")
+                    requested.remove(id_chunk)
 
     def connect(self):
         sock_ip_version = socket.AF_INET if self.ip_version == 4 else socket.AF_INET6
@@ -80,7 +92,7 @@ if __name__ == "__main__":
     if len(sys.argv) != 3:
         usage("client", sys.argv[0])
 
-    local_addr = ("127.0.0.1", 5000)
+    local_addr = const.c_addr
     peer_addr_str = sys.argv[1].split(":")
     starting_peer_addr, chunks = (peer_addr_str[0], int(peer_addr_str[1])), \
                                   list(map(int, sys.argv[2].split(",")))
