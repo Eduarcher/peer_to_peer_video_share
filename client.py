@@ -20,7 +20,7 @@ class Client:
 
     def __receive_request(self, sock):
         packet, addr = sock.recvfrom(buffer_size)
-        print(f"<-- Received: {packet} from {addr}")
+        print(f"<-- Received: {packet[:min(20, len(packet))]}(Showing 20 bytes) from {addr}")
         return packet, addr
 
     def __request_hello(self, sock):
@@ -49,6 +49,19 @@ class Client:
                   + self.__chunks_ids_to_bytes(request_chunks)
         print(f"--> Sending: {request} to {addr}")
         sock.sendto(request, addr)
+        return request_chunks
+
+    def __receive_chunks_response(self, sock, requested):
+        while len(self.target_chunks) > 0:
+            packet, addr = self.__receive_request(sock)
+            if int.from_bytes(packet[:2], 'big') != 5:
+                continue
+            else:
+                id_chunk = int.from_bytes(packet[2:4], 'big')
+                size_chunk = int.from_bytes(packet[4:6], 'big')
+                chunk_data = packet[6:]
+                print(f"{id_chunk}, {size_chunk}, {chunk_data[:20]}")
+                requested.remove(id_chunk)
 
     def connect(self):
         sock_ip_version = socket.AF_INET if self.ip_version == 4 else socket.AF_INET6
@@ -57,7 +70,8 @@ class Client:
             self.__request_hello(sock)
             available_chunks, peer_addr = self.__receive_chunks_info(sock)
             print(f"Available chunks: {available_chunks} at {peer_addr}")
-            self.__request_get_chunks(sock, available_chunks, peer_addr)
+            requested_chunks = self.__request_get_chunks(sock, available_chunks, peer_addr)
+            self.__receive_chunks_response(sock, requested_chunks)
         return 0
 
 

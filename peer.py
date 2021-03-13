@@ -35,11 +35,11 @@ class Peer:
         return sorted(list(set(self.local_chunks).intersection(chunks)))
 
     def __chunks_ids_to_bytes(self, chunks):
-        return b"".join([chunk.to_bytes(2, 'big') for chunk in chunks])
+        return b"".join([chunk.to_bytes(2, "big") for chunk in chunks])
 
     def __unpack_chunk_request(self, packet):
-        quantity_chunk = int.from_bytes(packet[2:4], 'big')
-        chunks_id_list = [int.from_bytes(packet[4 + (2 * x):6 + (2 * x)], 'big')
+        quantity_chunk = int.from_bytes(packet[2:4], "big")
+        chunks_id_list = [int.from_bytes(packet[4 + (2 * x):6 + (2 * x)], "big")
                           for x in range(0, quantity_chunk)]
         return chunks_id_list
 
@@ -50,7 +50,7 @@ class Peer:
 
     def __receive_hello(self):
         packet, client_addr = self.__receive_request()
-        if int.from_bytes(packet[:2], 'big') != 1:
+        if int.from_bytes(packet[:2], "big") != 1:
             self.__receive_hello()
         else:
             chunks_id_list = self.__unpack_chunk_request(packet)
@@ -58,14 +58,14 @@ class Peer:
 
     def __send_chunk_info(self, chunks_list, client_addr):
         available_chunks = self.__get_available_chunks_ids(chunks_list)
-        response = (3).to_bytes(2, 'big') + len(available_chunks).to_bytes(2, 'big') \
+        response = (3).to_bytes(2, "big") + len(available_chunks).to_bytes(2, "big") \
                     + self.__chunks_ids_to_bytes(available_chunks)
         print(f"--> Sending: {response} to {client_addr}")
         self.sock.sendto(response, client_addr)
 
     def __receive_get_chunks(self):
         packet, client_addr = self.__receive_request()
-        if int.from_bytes(packet[:2], 'big') != 4:
+        if int.from_bytes(packet[:2], "big") != 4:
             self.__receive_get_chunks()
         else:
             chunks_id_list = self.__unpack_chunk_request(packet)
@@ -74,7 +74,8 @@ class Peer:
     def __send_response_chunks(self, chunks, client_addr):
         for chunk in chunks:
             chunk_data = open("data/" + self.local_chunks[chunk], "rb").read(1024)
-            response = (5).to_bytes(2, 'big') + len(chunk_data).to_bytes(2, 'big')
+            response = (5).to_bytes(2, "big") + chunk.to_bytes(2, "big") \
+                       + len(chunk_data).to_bytes(2, "big") + chunk_data
             print(f"--> Sending: Chunk {chunk} to {client_addr}")
             self.sock.sendto(response, client_addr)
             sleep(.01)
