@@ -59,6 +59,7 @@ class Peer:
         self.sock.sendto(response, client_addr)
 
     def connect(self):
+        print("Peer started. Waiting for requests.")
         chunks_id_list, client_addr = self.__receive_hello()
         print(chunks_id_list, client_addr)
         self.__send_chunk_info(chunks_id_list, client_addr)

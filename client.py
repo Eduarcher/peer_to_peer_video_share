@@ -28,12 +28,23 @@ class Client:
         print(f"--> Sending: {request} to {self.starting_peer_addr}")
         sock.sendto(request, self.starting_peer_addr)
 
+    def __receive_chunks_info(self, sock):
+        packet, addr = self.__receive_request(sock)
+        if int.from_bytes(packet[:2], 'big') != 3:
+            self.__receive_chunks_info(sock)
+        else:
+            quantity_chunk = int.from_bytes(packet[2:4], 'big')
+            chunks_id_list = [int.from_bytes(packet[4 + (2 * x):6 + (2 * x)], 'big')
+                              for x in range(0, quantity_chunk)]
+            return chunks_id_list, addr
+
     def connect(self):
         sock_ip_version = socket.AF_INET if self.ip_version == 4 else socket.AF_INET6
         with socket.socket(sock_ip_version, socket.SOCK_DGRAM) as sock:
             sock.bind(self.local_addr)
             self.__request_hello(sock)
-            self.__receive_request(sock)
+            available_chunks, peer_addr = self.__receive_chunks_info(sock)
+            print(f"Available chunks: {available_chunks} at {peer_addr}")
         return 0
 
 
