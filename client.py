@@ -11,11 +11,12 @@ class Client:
         self.local_addr = local_addr
         self.starting_peer_addr = starting_peer_addr
         self.ip_version = ip_version
-        self.chunks = chunks
+        self.target_chunks = chunks
         self.quantity_chunks = len(chunks)
 
-    def __chunks_ids_to_bytes(self):
-        return b"".join([chunk.to_bytes(2, 'big') for chunk in self.chunks])
+    def __chunks_ids_to_bytes(self, chunks=None):
+        chunks = self.target_chunks if not chunks else chunks
+        return b"".join([chunk.to_bytes(2, 'big') for chunk in chunks])
 
     def __receive_request(self, sock):
         packet, addr = sock.recvfrom(buffer_size)
@@ -38,6 +39,17 @@ class Client:
                               for x in range(0, quantity_chunk)]
             return chunks_id_list, addr
 
+    def __request_get_chunks(self, sock, chunks, addr):
+        request_chunks = []
+        for chunk in chunks:
+            if chunk in self.target_chunks:
+                request_chunks.append(chunk)
+                self.target_chunks.remove(chunk)
+        request = (4).to_bytes(2, 'big') + len(request_chunks).to_bytes(2, 'big') \
+                  + self.__chunks_ids_to_bytes(request_chunks)
+        print(f"--> Sending: {request} to {addr}")
+        sock.sendto(request, addr)
+
     def connect(self):
         sock_ip_version = socket.AF_INET if self.ip_version == 4 else socket.AF_INET6
         with socket.socket(sock_ip_version, socket.SOCK_DGRAM) as sock:
@@ -45,6 +57,7 @@ class Client:
             self.__request_hello(sock)
             available_chunks, peer_addr = self.__receive_chunks_info(sock)
             print(f"Available chunks: {available_chunks} at {peer_addr}")
+            self.__request_get_chunks(sock, available_chunks, peer_addr)
         return 0
 
 
