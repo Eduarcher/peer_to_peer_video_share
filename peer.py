@@ -10,13 +10,12 @@ def decode_key_values_file(addr):
         chunks_dict = {}
         while True:
             line = key_values_file.readline()
-            if len(line) > 0:
-                chunk_id, chunk_file_name = line.split(sep=": ")
-                chunk_file_name_split = chunk_file_name.split('.')
-                chunk_file_name = chunk_file_name_split[0] + '.' + chunk_file_name_split[1][:3]
-                chunks_dict[int(chunk_id)] = chunk_file_name
-            else:
+            if len(line) <= 0:
                 break
+            chunk_id, chunk_file_name = line.split(sep=": ")
+            chunk_file_name_split = chunk_file_name.split('.')
+            chunk_file_name = chunk_file_name_split[0] + '.' + chunk_file_name_split[1][:3]
+            chunks_dict[int(chunk_id)] = chunk_file_name
         return chunks_dict
     except Exception as e:
         print("ERROR: Key values file not found or invalid.")
@@ -38,9 +37,10 @@ class Peer:
         return b"".join([chunk.to_bytes(2, "big") for chunk in chunks])
 
     def __unpack_chunk_request(self, packet):
+        # sourcery skip: inline-immediately-returned-variable
         quantity_chunk = int.from_bytes(packet[2:4], "big")
         chunks_id_list = [int.from_bytes(packet[4 + (2 * x):6 + (2 * x)], "big")
-                          for x in range(0, quantity_chunk)]
+                          for x in range(quantity_chunk)]
         return chunks_id_list
 
     def __receive_request(self):
@@ -83,7 +83,7 @@ class Peer:
     def connect(self):
         print("Peer started. Waiting for requests.")
         chunks_id, client_addr = self.__receive_hello()
-        print(f"Client searching for {chunks_id} at {client_addr}")
+        print(f"Client searching for {chunks_id} from {client_addr}")
         self.__send_chunk_info(chunks_id, client_addr)
         requested_chunks_id, client_addr = self.__receive_get_chunks()
         print(f"Client requested {requested_chunks_id} at {client_addr}")

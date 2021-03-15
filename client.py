@@ -1,8 +1,11 @@
 import socket
+from pathlib import Path
 import constants as const
 from libs.common import *
-from pathlib import Path
+from libs.testing_tools import *
+
 BUFFER_SIZE = const.buffer_size
+debug = const.debug_mode
 
 
 class Client:
@@ -43,7 +46,7 @@ class Client:
         else:
             quantity_chunk = int.from_bytes(packet[2:4], 'big')
             chunks_id_list = [int.from_bytes(packet[4 + (2 * x):6 + (2 * x)], 'big')
-                              for x in range(0, quantity_chunk)]
+                              for x in range(quantity_chunk)]
             return chunks_id_list, addr
 
     def __request_get_chunks(self, sock, chunks, addr):
@@ -65,16 +68,15 @@ class Client:
             packet, addr = self.__receive_request(sock)
             if int.from_bytes(packet[:2], 'big') != 5:
                 continue
-            else:
-                id_chunk = int.from_bytes(packet[2:4], 'big')
-                if id_chunk in requested:
-                    size_chunk = int.from_bytes(packet[4:6], 'big')
-                    chunk_data = packet[6:6+size_chunk]
-                    output_file = self.__init_folder_and_file(const.file_output_folder,
-                                                              f"chunk_{id_chunk}", True)
-                    output_file.write(chunk_data)
-                    log_file.write(f"{peer_addr[0]}:{peer_addr[1]} - {id_chunk}\n")
-                    requested.remove(id_chunk)
+            id_chunk = int.from_bytes(packet[2:4], 'big')
+            if id_chunk in requested:
+                size_chunk = int.from_bytes(packet[4:6], 'big')
+                chunk_data = packet[6:6+size_chunk]
+                output_file = self.__init_folder_and_file(const.file_output_folder,
+                                                          f"chunk_{id_chunk}", True)
+                output_file.write(chunk_data)
+                log_file.write(f"{peer_addr[0]}:{peer_addr[1]} - {id_chunk}\n")
+                requested.remove(id_chunk)
 
     def connect(self):
         sock_ip_version = socket.AF_INET if self.ip_version == 4 else socket.AF_INET6
@@ -92,10 +94,16 @@ if __name__ == "__main__":
     if len(sys.argv) != 3:
         usage("client", sys.argv[0])
 
-    local_addr = const.c_addr
+    # Define variables and process arguments
+    local_addr = const.client_addr
     peer_addr_str = sys.argv[1].split(":")
     starting_peer_addr, chunks = (peer_addr_str[0], int(peer_addr_str[1])), \
                                   list(map(int, sys.argv[2].split(",")))
 
+    # Delete output files if in debug mode
+    if debug:
+        delete_files(const.file_output_folder)
+
+    # Create Client object and connect
     client = Client(local_addr, starting_peer_addr, chunks)
     client.connect()
