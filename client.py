@@ -73,7 +73,7 @@ class Client:
                 size_chunk = int.from_bytes(packet[4:6], 'big')
                 chunk_data = packet[6:6+size_chunk]
                 output_file = self.__init_folder_and_file(const.file_output_folder,
-                                                          f"chunk_{id_chunk}", True)
+                                                          f"chunk_{id_chunk}.m4s", True)
                 output_file.write(chunk_data)
                 log_file.write(f"{peer_addr[0]}:{peer_addr[1]} - {id_chunk}\n")
                 requested.remove(id_chunk)
