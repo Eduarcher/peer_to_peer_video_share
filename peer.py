@@ -22,13 +22,22 @@ def decode_key_values_file(addr):
         sys.exit()
 
 
+def get_peers_connected(peers_addr):
+    try:
+        return [(peer.split(":")[0], int(peer.split(":")[1])) for peer in peers_addr]
+    except Exception as e:
+        print("ERROR: Peer input error, possible invalid peer address. Failed to initialize.")
+        sys.exit()
+
+
 class Peer:
-    def __init__(self, local_addr, local_chunks, ip_version=4):
+    def __init__(self, local_addr, local_chunks, peers_connected, ip_version=4):
         self.ip_version = socket.AF_INET if ip_version == 4 else socket.AF_INET6
         self.sock = socket.socket(self.ip_version, socket.SOCK_DGRAM)
         self.local_addr = local_addr
         self.sock.bind(self.local_addr)
         self.local_chunks = local_chunks
+        self.peers_connected = peers_connected
 
     def __get_available_chunks_ids(self, chunks):
         return sorted(list(set(self.local_chunks).intersection(chunks)))
@@ -37,7 +46,7 @@ class Peer:
         return b"".join([chunk.to_bytes(2, "big") for chunk in chunks])
 
     def __unpack_chunk_request(self, packet):
-        # sourcery skip: inline-immediately-returned-variable
+        # sourcery skip: inline-immediately-returned-variable TODO: remove this
         quantity_chunk = int.from_bytes(packet[2:4], "big")
         chunks_id_list = [int.from_bytes(packet[4 + (2 * x):6 + (2 * x)], "big")
                           for x in range(quantity_chunk)]
@@ -55,6 +64,9 @@ class Peer:
         else:
             chunks_id_list = self.__unpack_chunk_request(packet)
             return chunks_id_list, client_addr
+
+    def __send_query(self):
+        pass
 
     def __send_chunk_info(self, chunks_list, client_addr):
         available_chunks = self.__get_available_chunks_ids(chunks_list)
@@ -84,6 +96,7 @@ class Peer:
         print("Peer started. Waiting for requests.")
         chunks_id, client_addr = self.__receive_hello()
         print(f"Client searching for {chunks_id} from {client_addr}")
+        self.__send_query()
         self.__send_chunk_info(chunks_id, client_addr)
         requested_chunks_id, client_addr = self.__receive_get_chunks()
         print(f"Client requested {requested_chunks_id} at {client_addr}")
@@ -96,6 +109,7 @@ if __name__ == "__main__":
 
     local_addr = ('127.0.0.1', int(sys.argv[1]))
     local_chunks = decode_key_values_file(sys.argv[2])
+    peers_connected = get_peers_connected(sys.argv[3:])
 
-    peer = Peer(local_addr, local_chunks)
+    peer = Peer(local_addr, local_chunks, peers_connected)
     peer.connect()
