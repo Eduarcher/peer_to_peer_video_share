@@ -62,14 +62,17 @@ class Peer:
                           for x in range(quantity_chunk)]
         return chunks_id_list
 
-    def __send_query(self, chunks, addr):
-        addr = self.format_addr_for_query(addr)
-        query = (2).to_bytes(2, "big") + addr + const.initial_peer_ttl.to_bytes(2, 'big') \
-                    + len(chunks).to_bytes(2, 'big') + self.__chunks_ids_to_bytes(chunks)
-        print(f"Sending: {query} to connected peers")
-        for peer_addr in self.peers_connected:
-            print(f"--> Sending query to {peer_addr}")
-            self.sock.sendto(query, peer_addr)
+    def __send_query(self, chunks, addr, ttl=None, origin=None):
+        ttl = const.initial_peer_ttl if ttl is None else ttl
+        if ttl > 0:
+            addr = self.format_addr_for_query(addr)
+            query = (2).to_bytes(2, "big") + addr + ttl.to_bytes(2, 'big') \
+                        + len(chunks).to_bytes(2, 'big') + self.__chunks_ids_to_bytes(chunks)
+            print(f"Sending: {query} to connected peers")
+            for peer_addr in self.peers_connected:
+                if peer_addr != origin:
+                    print(f"--> Sending query to {peer_addr}")
+                    self.sock.sendto(query, peer_addr)
 
     def __unpack_query(self, packet):
         addr_ip = ".".join(str(num) for num in packet[2:6])
@@ -112,6 +115,8 @@ class Peer:
             elif request_code == 2:  # Query from peer
                 client_addr, ttl, searched_chunks_id = self.__unpack_query(packet)
                 print(f"Received query: {client_addr}, {ttl}, {searched_chunks_id}")
+                self.__send_query(searched_chunks_id, client_addr, ttl-1, sender_addr)
+                self.__send_chunk_info(searched_chunks_id, client_addr)
 
 
 if __name__ == "__main__":
