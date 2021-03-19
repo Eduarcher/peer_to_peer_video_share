@@ -123,7 +123,8 @@ if __name__ == "__main__":
     if len(sys.argv) < 4:
         usage("peer", sys.argv[0])
 
-    local_addr = ('127.0.0.1', int(sys.argv[1]))
+    addr_args = sys.argv[1].split(":")
+    local_addr = (addr_args[0], int(addr_args[1]))
     local_chunks = decode_key_values_from_file(sys.argv[2])
     peers_connected = get_peers_connected_from_file(sys.argv[3:])
 
