@@ -31,10 +31,20 @@ class Client:
         Path(folder).mkdir(parents=True, exist_ok=True)
         return open(f"{folder}{file}", write_method)
 
+    def __write_log_remaining_packets(self, packets):
+        for packet in packets:
+            self.log_file.write(f"0.0.0.0:0 - {packet}\n")
+
     def __receive_request(self, sock):
-        packet, addr = sock.recvfrom(BUFFER_SIZE)
-        print(f"<-- Received: {packet[:min(20, len(packet))]}(Showing 20 bytes) from {addr}")
-        return packet, addr
+        try:
+            sock.settimeout(const.client_timeout)
+            packet, addr = sock.recvfrom(BUFFER_SIZE)
+            print(f"<-- Received: {packet[:min(20, len(packet))]}"
+                  f"(Showing 20 bytes) from {addr}")
+            return packet, addr
+        except socket.timeout:
+            print("No packet received")
+            return b'', None
 
     def __request_hello(self, sock):
         request = (1).to_bytes(2, 'big') + self.quantity_chunks.to_bytes(2, 'big') \
@@ -67,8 +77,8 @@ class Client:
             size_chunk = int.from_bytes(packet[4:6], 'big')
             chunk_data = packet[6:6+size_chunk]
             output_file = self.__init_folder_and_file(const.file_output_folder,
-                   f"{const.output_chunks_filename}"
-                   f"{id_chunk}{const.output_chunks_format}", True)
+                               f"{const.output_chunks_filename}"
+                               f"{id_chunk}{const.output_chunks_format}", True)
             output_file.write(chunk_data)
             self.log_file.write(f"{peer_addr[0]}:{peer_addr[1]} - {id_chunk}\n")
             requested.remove(id_chunk)
@@ -84,16 +94,21 @@ class Client:
                 packet, addr = self.__receive_request(sock)
                 packet_code = int.from_bytes(packet[:2], 'big')
                 if len(packet) == 0:
-                    print("Timeout. Transference cancelled.")  # TODO criar timeout
+                    print("Timeout. Transference cancelled.")
+                    sock.close()
+                    self.__write_log_remaining_packets(remaining_packets)
                     return -1
                 if packet_code == 3:
                     available_chunks, peer_addr = self.__receive_chunks_info(packet, addr)
                     print(f"Available chunks: {available_chunks} at {peer_addr}")
                     self.__request_get_chunks(sock, available_chunks, peer_addr)
                 if packet_code == 5:
-                    remaining_packets = self.__receive_chunks_response(packet, remaining_packets, peer_addr)
+                    remaining_packets = self.__receive_chunks_response(packet,
+                                                                       remaining_packets,
+                                                                       addr)
                 if len(remaining_packets) == 0:
                     print("Transference complete.")
+                    sock.close()
                     return 0
 
 
@@ -102,7 +117,8 @@ if __name__ == "__main__":
         usage("client", sys.argv[0])
 
     # Define variables and process arguments
-    local_addr = const.client_addr
+    local_addr = const.client_addr if const.client_addr else \
+        (socket.gethostbyname(socket.gethostname()), 5000)
     peer_addr_str = sys.argv[1].split(":")
     starting_peer_addr, chunks = (peer_addr_str[0], int(peer_addr_str[1])), \
                                   list(map(int, sys.argv[2].split(",")))
